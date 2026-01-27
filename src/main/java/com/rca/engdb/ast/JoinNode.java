@@ -8,6 +8,10 @@ public class JoinNode {
     private String rightColumn;
     private JoinType joinType;
 
+    public JoinNode() {
+        // No-arg constructor for builder pattern
+    }
+
     public JoinNode(String leftTable, String rightTable, String leftColumn, String rightColumn, JoinType joinType) {
         this.leftTable = leftTable;
         this.rightTable = rightTable;

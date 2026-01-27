@@ -8,6 +8,7 @@ import com.rca.engdb.ml.IntentResult;
 import com.rca.engdb.ml.IntentType;
 import com.rca.engdb.nlp.ConditionExtractor;
 import com.rca.engdb.nlp.EntityRecognizer;
+import com.rca.engdb.nlp.JoinDetector;
 import com.rca.engdb.schema.SchemaDiscoveryService;
 import com.rca.engdb.schema.SchemaRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +40,14 @@ class QueryPipelineTest {
             "courses", List.of("id", "name", "credits")
         ));
 
+        // Mock SchemaDiscoveryService
+        SchemaDiscoveryService schemaDiscoveryService = Mockito.mock(SchemaDiscoveryService.class);
+
         // Initialize Components
         entityRecognizer = new EntityRecognizer(schemaRegistry);
         conditionExtractor = new ConditionExtractor(schemaRegistry);
-        queryParser = new QueryParser(entityRecognizer, conditionExtractor);
+        JoinDetector joinDetector = new JoinDetector(schemaRegistry);
+        queryParser = new QueryParser(entityRecognizer, conditionExtractor, joinDetector, schemaDiscoveryService);
         queryGenerator = new QueryGenerator();
     }
 

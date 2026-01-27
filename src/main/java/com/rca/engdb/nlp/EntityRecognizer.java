@@ -22,24 +22,48 @@ public class EntityRecognizer {
         List<String> recognizedColumns = new ArrayList<>();
         
         // Find best matching table
+        // IMPORTANT: Store the actual table name from schema, not the token
         for (String token : tokens) {
             for (String tableName : schema.keySet()) {
                 double score = calculateSimilarity(token, tableName);
                 if (score > bestTableScore && score > 0.6) {
                     bestTableScore = score;
-                    bestTable = tableName;
+                    bestTable = tableName;  // Use actual table name from schema
                 }
             }
         }
         
         // If table found, look for column names
+        // Only recognize columns if they appear in specific contexts (e.g., "show name and age")
         if (bestTable != null) {
             List<String> columns = schema.get(bestTable);
-            for (String token : tokens) {
+            boolean hasExplicitColumns = false;
+            
+            for (int i = 0; i < tokens.size(); i++) {
+                String token = tokens.get(i);
                 for (String columnName : columns) {
                     double score = calculateSimilarity(token, columnName);
                     if (score > 0.7 && !recognizedColumns.contains(columnName)) {
-                        recognizedColumns.add(columnName);
+                        // Only add if it's not part of a WHERE clause pattern
+                        // Check if previous or next token suggests this is a filter, not a selection
+                        boolean isFilter = false;
+                        if (i + 1 < tokens.size()) {
+                            String next = tokens.get(i + 1).toLowerCase();
+                            // If followed by a value (not "and", "or"), it's likely a filter
+                            if (!next.equals("and") && !next.equals("or") && !next.equals(",")) {
+                                // Check if next token could be a value
+                                boolean nextIsColumn = columns.stream()
+                                    .anyMatch(col -> calculateSimilarity(next, col) > 0.7);
+                                if (!nextIsColumn) {
+                                    isFilter = true;
+                                }
+                            }
+                        }
+                        
+                        if (!isFilter) {
+                            recognizedColumns.add(columnName);
+                            hasExplicitColumns = true;
+                        }
                     }
                 }
             }
@@ -52,7 +76,7 @@ public class EntityRecognizer {
         }
         
         return new EntityRecognitionResult(
-            bestTable,
+            bestTable,  // This is the actual table name from schema
             recognizedColumns.isEmpty() ? List.of("*") : recognizedColumns,
             confidence
         );

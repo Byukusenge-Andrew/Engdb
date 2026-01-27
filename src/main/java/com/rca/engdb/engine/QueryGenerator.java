@@ -6,6 +6,7 @@ import com.rca.engdb.ast.QueryAST;
 import com.rca.engdb.ml.IntentType;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -137,8 +138,127 @@ public class QueryGenerator {
     }
 
     public String generateMongoQuery(QueryAST ast) {
-        // TODO: Implement MongoDB query generation
-        // For now, return a placeholder
-        return "{ \"collection\": \"" + ast.getTargetTable() + "\" }";
+        if (ast.getTargetTable() == null) {
+            throw new IllegalArgumentException("Target collection cannot be null");
+        }
+
+        StringBuilder mongoQuery = new StringBuilder();
+        mongoQuery.append("db.").append(ast.getTargetTable());
+
+        switch (ast.getIntent()) {
+            case SELECT:
+                mongoQuery.append(".find(");
+                // Build filter
+                if (!ast.getWhereConditions().isEmpty()) {
+                    mongoQuery.append(buildMongoFilter(ast.getWhereConditions()));
+                } else {
+                    mongoQuery.append("{}");
+                }
+                mongoQuery.append(")");
+                
+                // Projection
+                if (!ast.getSelectColumns().isEmpty() && !ast.getSelectColumns().contains("*")) {
+                    mongoQuery.append(".projection({");
+                    for (int i = 0; i < ast.getSelectColumns().size(); i++) {
+                        if (i > 0) mongoQuery.append(", ");
+                        mongoQuery.append("\"").append(ast.getSelectColumns().get(i)).append("\": 1");
+                    }
+                    mongoQuery.append("})");
+                }
+                break;
+
+            case COUNT:
+                mongoQuery.append(".countDocuments(");
+                if (!ast.getWhereConditions().isEmpty()) {
+                    mongoQuery.append(buildMongoFilter(ast.getWhereConditions()));
+                } else {
+                    mongoQuery.append("{}");
+                }
+                mongoQuery.append(")");
+                break;
+
+            case SUM:
+            case AVG:
+            case MAX:
+            case MIN:
+                mongoQuery.append(".aggregate([");
+                
+                // Match stage
+                if (!ast.getWhereConditions().isEmpty()) {
+                    mongoQuery.append("{$match: ").append(buildMongoFilter(ast.getWhereConditions())).append("}, ");
+                }
+                
+                // Group stage
+                mongoQuery.append("{$group: {_id: null, result: {");
+                String aggOp = ast.getIntent().name().toLowerCase();
+                mongoQuery.append("$").append(aggOp).append(": ");
+                
+                if (ast.getAggregateColumn() != null) {
+                    mongoQuery.append("\"$").append(ast.getAggregateColumn()).append("\"");
+                } else {
+                    mongoQuery.append("1");
+                }
+                
+                mongoQuery.append("}}}])");
+                break;
+
+            default:
+                mongoQuery.append(".find({})");
+        }
+
+        if (ast.getLimit() != null) {
+            mongoQuery.append(".limit(").append(ast.getLimit()).append(")");
+        }
+
+        return mongoQuery.toString();
+    }
+
+    private String buildMongoFilter(List<ConditionNode> conditions) {
+        StringBuilder filter = new StringBuilder("{");
+        
+        for (int i = 0; i < conditions.size(); i++) {
+            if (i > 0) filter.append(", ");
+            
+            ConditionNode condition = conditions.get(i);
+            filter.append("\"").append(condition.getColumn()).append("\": ");
+            
+            // Handle operators
+            switch (condition.getOperator()) {
+                case "=":
+                    if (condition.getValue() instanceof String) {
+                        filter.append("\"").append(condition.getValue()).append("\"");
+                    } else {
+                        filter.append(condition.getValue());
+                    }
+                    break;
+                case ">":
+                    filter.append("{$gt: ").append(formatMongoValue(condition.getValue())).append("}");
+                    break;
+                case "<":
+                    filter.append("{$lt: ").append(formatMongoValue(condition.getValue())).append("}");
+                    break;
+                case ">=":
+                    filter.append("{$gte: ").append(formatMongoValue(condition.getValue())).append("}");
+                    break;
+                case "<=":
+                    filter.append("{$lte: ").append(formatMongoValue(condition.getValue())).append("}");
+                    break;
+                case "!=":
+                    filter.append("{$ne: ").append(formatMongoValue(condition.getValue())).append("}");
+                    break;
+                default:
+                    filter.append("\"").append(condition.getValue()).append("\"");
+            }
+        }
+        
+        filter.append("}");
+        return filter.toString();
+    }
+
+    private String formatMongoValue(Object value) {
+        if (value instanceof String) {
+            return "\"" + value + "\"";
+        }
+        return String.valueOf(value);
     }
 }

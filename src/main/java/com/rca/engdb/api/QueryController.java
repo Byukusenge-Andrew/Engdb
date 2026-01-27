@@ -56,28 +56,35 @@ public class QueryController {
 
         // 2. Query Parsing & Generation
         try {
-            QueryAST ast = queryParser.parse(tokens, intentResult); // Use original tokens for entity recognition context if needed, or cleaned
-            // For now using tokens as EntityRecognizer might need uncleaned ones? 
-            // Actually EntityRecognizer uses tokens. Let's pass 'cleaned' if EntityRecognizer expects lemmas, 
-            // or 'tokens' if it expects exact words. 
-            // Looking at EntityRecognizer, it does fuzzy match. 'cleaned' is safer for now.
-            // But wait, parse signature in QueryParser takes `List<String> tokens`.
-            
-            // Re-parsing with cleaned tokens for better matching
-             ast = queryParser.parse(cleaned, intentResult);
+            QueryAST ast = queryParser.parse(cleaned, intentResult);
 
-            // 3. Generation
-            String sql = queryGenerator.generateSQL(ast);
+            // 3. Choose database type
+            QueryPlanner planner = new QueryPlanner();
+            QueryPlanner.DatabaseType dbType = planner.chooseDatabaseType(ast);
 
-            // 4. Execution
-            var result = queryExecutor.executeSQLQuery(sql);
+            String generatedQuery;
+            QueryExecutor.QueryResult result;
+
+            if (dbType == QueryPlanner.DatabaseType.MONGODB) {
+                // MongoDB execution
+                generatedQuery = queryGenerator.generateMongoQuery(ast);
+                // Note: Actual MongoDB execution would require parsing the generated query
+                // For now, we'll fall back to SQL
+                String sql = queryGenerator.generateSQL(ast);
+                result = queryExecutor.executeSQLQuery(sql);
+                generatedQuery = sql + " (MongoDB: " + generatedQuery + ")";
+            } else {
+                // MySQL execution
+                generatedQuery = queryGenerator.generateSQL(ast);
+                result = queryExecutor.executeSQLQuery(generatedQuery);
+            }
 
             return new QueryResponse(
                 intentResult.getIntent().name(),
-                sql,
+                generatedQuery,
                 result.getData(),
                 result.getRowCount(),
-                intentResult.getConfidence(), // TODO: combine with entity confidence
+                intentResult.getConfidence(),
                 result.getExecutionTimeMs(),
                 result.getErrorMessage()
             );
