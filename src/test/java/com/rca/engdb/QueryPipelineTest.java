@@ -9,6 +9,7 @@ import com.rca.engdb.ml.IntentType;
 import com.rca.engdb.nlp.ConditionExtractor;
 import com.rca.engdb.nlp.EntityRecognizer;
 import com.rca.engdb.nlp.JoinDetector;
+import com.rca.engdb.nlp.SynonymRegistry;
 import com.rca.engdb.schema.SchemaDiscoveryService;
 import com.rca.engdb.schema.SchemaRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,7 @@ class QueryPipelineTest {
     private SchemaRegistry schemaRegistry;
     private EntityRecognizer entityRecognizer;
     private ConditionExtractor conditionExtractor;
+    private SynonymRegistry synonymRegistry;
     private QueryParser queryParser;
     private QueryGenerator queryGenerator;
 
@@ -44,7 +46,8 @@ class QueryPipelineTest {
         SchemaDiscoveryService schemaDiscoveryService = Mockito.mock(SchemaDiscoveryService.class);
 
         // Initialize Components
-        entityRecognizer = new EntityRecognizer(schemaRegistry);
+        synonymRegistry = new SynonymRegistry();
+        entityRecognizer = new EntityRecognizer(schemaRegistry, synonymRegistry);
         conditionExtractor = new ConditionExtractor(schemaRegistry);
         JoinDetector joinDetector = new JoinDetector(schemaRegistry);
         queryParser = new QueryParser(entityRecognizer, conditionExtractor, joinDetector, schemaDiscoveryService);

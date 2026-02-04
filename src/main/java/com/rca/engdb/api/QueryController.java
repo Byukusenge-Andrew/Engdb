@@ -83,6 +83,19 @@ public class QueryController {
                 ast.setDatabaseName(dbName);
             }
 
+            // Check if a target table was identified
+            if (ast.getTargetTable() == null) {
+                return new QueryResponse(
+                    intentResult.getIntent().name(),
+                    "Could not identify a clear query target (table). Please include a valid table name in your question.",
+                    Collections.emptyList(),
+                    0,
+                    intentResult.getConfidence(),
+                    0,
+                    "No target table identified in query"
+                );
+            }
+
             // 3. Choose database type
             QueryPlanner planner = new QueryPlanner();
             QueryPlanner.DatabaseType dbType = planner.chooseDatabaseType(ast);

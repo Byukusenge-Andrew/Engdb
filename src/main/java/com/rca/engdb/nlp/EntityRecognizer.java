@@ -1,6 +1,7 @@
 package com.rca.engdb.nlp;
 
 import com.rca.engdb.schema.SchemaRegistry;
+import com.rca.engdb.util.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -9,9 +10,11 @@ import java.util.*;
 public class EntityRecognizer {
 
     private final SchemaRegistry schemaRegistry;
+    private final SynonymRegistry synonymRegistry;
 
-    public EntityRecognizer(SchemaRegistry schemaRegistry) {
+    public EntityRecognizer(SchemaRegistry schemaRegistry, SynonymRegistry synonymRegistry) {
         this.schemaRegistry = schemaRegistry;
+        this.synonymRegistry = synonymRegistry;
     }
 
     public EntityRecognitionResult recognize(List<String> tokens) {
@@ -26,47 +29,66 @@ public class EntityRecognizer {
         List<String> recognizedColumns = new ArrayList<>();
         
         // Find best matching table
-        // IMPORTANT: Store the actual table name from schema, not the token
         for (String token : tokens) {
+            // 1. Resolve Synonyms
+            String resolvedToken = synonymRegistry.resolve(token);
+            
+            // 2. Check each table in schema
             for (String tableName : schema.keySet()) {
+                // Check original token
                 double score = calculateSimilarity(token, tableName);
+                
+                // Check resolved synonym if different
+                if (!resolvedToken.equals(token)) {
+                    score = Math.max(score, calculateSimilarity(resolvedToken, tableName));
+                }
+
+                // 3. Fuzzy Match (if score is low)
+                if (score < 0.8) {
+                    // Allow 1 edit for short words (len<=4), 2 for longer
+                    int maxDist = tableName.length() <= 4 ? 1 : 2;
+                    int dist = StringUtils.calculateLevenshteinDistance(token, tableName);
+                    if (dist <= maxDist) {
+                        score = Math.max(score, 0.85); // High confidence for fuzzy match
+                    }
+                }
+
                 if (score > bestTableScore && score > 0.6) {
                     bestTableScore = score;
-                    bestTable = tableName;  // Use actual table name from schema
+                    bestTable = tableName;
                 }
             }
         }
         
         // If table found, look for column names
-        // Only recognize columns if they appear in specific contexts (e.g., "show name and age")
         if (bestTable != null) {
             List<String> columns = schema.get(bestTable);
-            boolean hasExplicitColumns = false;
             
             for (int i = 0; i < tokens.size(); i++) {
                 String token = tokens.get(i);
+                String resolvedToken = synonymRegistry.resolve(token);
+                
                 for (String columnName : columns) {
                     double score = calculateSimilarity(token, columnName);
-                    if (score > 0.7 && !recognizedColumns.contains(columnName)) {
-                        // Only add if it's not part of a WHERE clause pattern
-                        // Check if previous or next token suggests this is a filter, not a selection
-                        boolean isFilter = false;
-                        if (i + 1 < tokens.size()) {
-                            String next = tokens.get(i + 1).toLowerCase();
-                            // If followed by a value (not "and", "or"), it's likely a filter
-                            if (!next.equals("and") && !next.equals("or") && !next.equals(",")) {
-                                // Check if next token could be a value
-                                boolean nextIsColumn = columns.stream()
-                                    .anyMatch(col -> calculateSimilarity(next, col) > 0.7);
-                                if (!nextIsColumn) {
-                                    isFilter = true;
-                                }
-                            }
+                    
+                    if (!resolvedToken.equals(token)) {
+                        score = Math.max(score, calculateSimilarity(resolvedToken, columnName));
+                    }
+                    
+                    // Fuzzy match for columns
+                    if (score < 0.8) {
+                        int maxDist = columnName.length() <= 4 ? 1 : 2;
+                        if (StringUtils.calculateLevenshteinDistance(token, columnName) <= maxDist) {
+                            score = Math.max(score, 0.8);
                         }
+                    }
+
+                    if (score > 0.7 && !recognizedColumns.contains(columnName)) {
+                        // Avoid misidentifying filter values as columns
+                        boolean isFilter = isFilterContext(tokens, i, columns);
                         
                         if (!isFilter) {
                             recognizedColumns.add(columnName);
-                            hasExplicitColumns = true;
                         }
                     }
                 }
@@ -80,18 +102,33 @@ public class EntityRecognizer {
         }
         
         return new EntityRecognitionResult(
-            bestTable,  // This is the actual table name from schema
+            bestTable,
             recognizedColumns.isEmpty() ? List.of("*") : recognizedColumns,
             confidence
         );
     }
+    
+    private boolean isFilterContext(List<String> tokens, int currentIndex, List<String> columns) {
+        if (currentIndex + 1 < tokens.size()) {
+            String next = tokens.get(currentIndex + 1).toLowerCase();
+            // If followed by something that isn't a connector, likely a filter
+            if (!next.equals("and") && !next.equals("or") && !next.equals(",")) {
+                // Unless the next word is ALSO a column
+                boolean nextIsColumn = columns.stream().anyMatch(col -> col.equalsIgnoreCase(next));
+                 
+                 // Or a standard keyword
+                 if (next.equals("is") || next.equals("=")) return false; // "column is value"
+
+                 if (!nextIsColumn) {
+                     return true;
+                 }
+            }
+        }
+        return false;
+    }
 
     /**
-     * Calculate similarity between two strings using a simple approach:
-     * - Exact match = 1.0
-     * - Singular/plural match = 0.9
-     * - Substring match = 0.7
-     * - No match = 0.0
+     * Calculate similarity between two strings
      */
     private double calculateSimilarity(String token, String target) {
         token = token.toLowerCase();
@@ -104,16 +141,16 @@ public class EntityRecognizer {
         
         // Handle plural/singular
         if (token.equals(target + "s") || (token + "s").equals(target)) {
-            return 0.9;
+            return 0.95;
         }
         
         // Handle common variations
         if (token.endsWith("s") && token.substring(0, token.length() - 1).equals(target)) {
-            return 0.9;
+            return 0.95;
         }
         
         if (target.endsWith("s") && target.substring(0, target.length() - 1).equals(token)) {
-            return 0.9;
+            return 0.95;
         }
         
         // Substring match

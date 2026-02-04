@@ -9,6 +9,7 @@ import com.rca.engdb.ml.IntentType;
 import com.rca.engdb.nlp.ConditionExtractor;
 import com.rca.engdb.nlp.EntityRecognizer;
 import com.rca.engdb.nlp.JoinDetector;
+import com.rca.engdb.nlp.SynonymRegistry;
 import com.rca.engdb.schema.SchemaDiscoveryService;
 import com.rca.engdb.schema.SchemaGraph;
 import com.rca.engdb.schema.SchemaRegistry;
@@ -29,6 +30,7 @@ class JoinSupportTest {
     private SchemaDiscoveryService schemaDiscoveryService;
     private EntityRecognizer entityRecognizer;
     private ConditionExtractor conditionExtractor;
+    private SynonymRegistry synonymRegistry;
     private JoinDetector joinDetector;
     private QueryParser queryParser;
     private QueryGenerator queryGenerator;
@@ -54,7 +56,8 @@ class JoinSupportTest {
         when(schemaDiscoveryService.getSchemaGraph()).thenReturn(schemaGraph);
 
         // Initialize components
-        entityRecognizer = new EntityRecognizer(schemaRegistry);
+        synonymRegistry = new SynonymRegistry();
+        entityRecognizer = new EntityRecognizer(schemaRegistry, synonymRegistry);
         conditionExtractor = new ConditionExtractor(schemaRegistry);
         joinDetector = new JoinDetector(schemaRegistry);
         queryParser = new QueryParser(entityRecognizer, conditionExtractor, joinDetector, schemaDiscoveryService);
