@@ -15,7 +15,11 @@ public class EntityRecognizer {
     }
 
     public EntityRecognitionResult recognize(List<String> tokens) {
-        var schema = schemaRegistry.getSchema();
+        return recognize(tokens, null);
+    }
+
+    public EntityRecognitionResult recognize(List<String> tokens, String dbName) {
+        var schema = schemaRegistry.getSchema(dbName);
         
         String bestTable = null;
         double bestTableScore = 0.0;

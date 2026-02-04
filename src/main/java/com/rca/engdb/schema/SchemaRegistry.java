@@ -22,8 +22,12 @@ public class SchemaRegistry {
     );
 
     public Map<String, List<String>> getSchema() {
-        Map<String, List<String>> discovered = discoveryService.discoverSchema();
-        if (discovered.isEmpty()) {
+        return getSchema(null);
+    }
+    
+    public Map<String, List<String>> getSchema(String dbName) {
+        Map<String, List<String>> discovered = discoveryService.discoverSchema(dbName);
+        if (discovered == null || discovered.isEmpty()) {
             return FALLBACK_SCHEMA;
         }
         return discovered;

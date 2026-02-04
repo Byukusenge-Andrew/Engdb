@@ -13,6 +13,8 @@ import com.rca.engdb.ml.IntentResult;
 import com.rca.engdb.nlp.PreprocessService;
 import com.rca.engdb.nlp.TokenizerService;
 import com.rca.engdb.ast.QueryAST;
+import com.rca.engdb.schema.DatabaseDiscoveryService;
+import com.rca.engdb.schema.SchemaDiscoveryService;
 
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +31,8 @@ public class QueryController {
     private final QueryParser queryParser;
     private final QueryGenerator queryGenerator;
     private final QueryExecutor queryExecutor;
+    private final DatabaseDiscoveryService databaseDiscoveryService;
+    private final SchemaDiscoveryService schemaDiscoveryService;
 
     public QueryController(
             TokenizerService tokenizer,
@@ -36,7 +40,9 @@ public class QueryController {
             IntentClassifier intentClassifier,
             QueryParser queryParser,
             QueryGenerator queryGenerator,
-            QueryExecutor queryExecutor) {
+            QueryExecutor queryExecutor,
+            DatabaseDiscoveryService databaseDiscoveryService,
+            SchemaDiscoveryService schemaDiscoveryService) {
 
         this.tokenizer = tokenizer;
         this.preprocessor = preprocessor;
@@ -44,6 +50,18 @@ public class QueryController {
         this.queryParser = queryParser;
         this.queryGenerator = queryGenerator;
         this.queryExecutor = queryExecutor;
+        this.databaseDiscoveryService = databaseDiscoveryService;
+        this.schemaDiscoveryService = schemaDiscoveryService;
+    }
+    
+    @GetMapping("/databases")
+    public List<String> getDatabases() {
+        return databaseDiscoveryService.getAllDatabases();
+    }
+    
+    @GetMapping("/schema")
+    public java.util.Map<String, List<String>> getSchema(@RequestParam(required = false) String dbName) {
+        return schemaDiscoveryService.discoverSchema(dbName); 
     }
 
     @PostMapping
@@ -53,10 +71,17 @@ public class QueryController {
         var tokens = tokenizer.tokenize(request.getQuery());
         var cleaned = preprocessor.clean(tokens);
         var intentResult = intentClassifier.classify(cleaned);
+        
+        String dbName = request.getDatabaseName();
 
         // 2. Query Parsing & Generation
         try {
-            QueryAST ast = queryParser.parse(cleaned, intentResult);
+            QueryAST ast = queryParser.parse(cleaned, intentResult, dbName);
+            
+            // Set database context in AST for generation
+            if (dbName != null && !dbName.isEmpty()) {
+                ast.setDatabaseName(dbName);
+            }
 
             // 3. Choose database type
             QueryPlanner planner = new QueryPlanner();
@@ -90,6 +115,7 @@ public class QueryController {
             );
 
         } catch (Exception e) {
+            e.printStackTrace();
             // Fallback for failed parsing/generation
             return new QueryResponse(
                 intentResult.getIntent().name(),

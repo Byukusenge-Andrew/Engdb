@@ -16,6 +16,7 @@ public class QueryAST {
     private Integer limit;
     private String orderByColumn;
     private OrderDirection orderDirection;
+    private String databaseName;
 
     public QueryAST() {
         this.selectColumns = new ArrayList<>();
@@ -98,5 +99,13 @@ public class QueryAST {
     public enum OrderDirection {
         ASC,
         DESC
+    }
+
+    public String getDatabaseName() {
+        return databaseName;
+    }
+
+    public void setDatabaseName(String databaseName) {
+        this.databaseName = databaseName;
     }
 }

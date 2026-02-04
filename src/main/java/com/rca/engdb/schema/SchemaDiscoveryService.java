@@ -16,49 +16,65 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SchemaDiscoveryService {
 
     private final DataSource dataSource;
-    private final Map<String, List<String>> cachedSchema = new ConcurrentHashMap<>();
-    private final SchemaGraph schemaGraph = new SchemaGraph();
-    private long lastRefreshTime = 0;
+    // Map<DatabaseName, Map<TableName, List<ColumnName>>>
+    private final Map<String, Map<String, List<String>>> globalSchemaCache = new ConcurrentHashMap<>();
+    
+    // Map<DatabaseName, SchemaGraph>
+    private final Map<String, SchemaGraph> globalGraphCache = new ConcurrentHashMap<>();
+    
+    private final Map<String, Long> lastRefreshTimes = new ConcurrentHashMap<>();
     private static final long DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour default
     private long cacheTtlMs = DEFAULT_CACHE_TTL_MS;
+    
+    private String defaultDatabase = "engdb";
 
     public SchemaDiscoveryService(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
     /**
-     * Discover schema from the database or return cached version
-     * Cache is refreshed if TTL has expired
+     * Discover schema for the default database or return cached version
      */
     public Map<String, List<String>> discoverSchema() {
-        long now = System.currentTimeMillis();
-        boolean cacheExpired = (now - lastRefreshTime) > cacheTtlMs;
+        return discoverSchema(defaultDatabase);
+    }
+    
+    /**
+     * Discover schema for a specific database
+     */
+    public Map<String, List<String>> discoverSchema(String dbName) {
+        if (dbName == null || dbName.isEmpty()) dbName = defaultDatabase;
         
-        if (cachedSchema.isEmpty() || cacheExpired) {
-            refreshSchema();
-            lastRefreshTime = now;
+        long now = System.currentTimeMillis();
+        long lastRefresh = lastRefreshTimes.getOrDefault(dbName, 0L);
+        boolean cacheExpired = (now - lastRefresh) > cacheTtlMs;
+        
+        if (!globalSchemaCache.containsKey(dbName) || cacheExpired) {
+            refreshSchema(dbName);
+            lastRefreshTimes.put(dbName, now);
         }
         
-        return cachedSchema;
+        return globalSchemaCache.get(dbName);
     }
 
     /**
-     * Force refresh of the schema from the database
+     * Force refresh of the schema for a specific database
      */
-    public void refreshSchema() {
+    public void refreshSchema(String dbName) {
         Map<String, List<String>> newSchema = new HashMap<>();
+        SchemaGraph newGraph = new SchemaGraph();
         
         try (Connection connection = dataSource.getConnection()) {
             DatabaseMetaData metaData = connection.getMetaData();
             
-            // Get all tables
-            try (ResultSet tables = metaData.getTables(null, null, "%", new String[]{"TABLE"})) {
+            // Get tables for specific database (catalog)
+            try (ResultSet tables = metaData.getTables(dbName, null, "%", new String[]{"TABLE"})) {
                 while (tables.next()) {
                     String tableName = tables.getString("TABLE_NAME");
                     List<String> columns = new ArrayList<>();
                     
-                    // Get columns for this table
-                    try (ResultSet cols = metaData.getColumns(null, null, tableName, "%")) {
+                    // Get columns
+                    try (ResultSet cols = metaData.getColumns(dbName, null, tableName, "%")) {
                         while (cols.next()) {
                             columns.add(cols.getString("COLUMN_NAME"));
                         }
@@ -68,14 +84,14 @@ public class SchemaDiscoveryService {
                 }
             }
             
-            cachedSchema.clear();
-            cachedSchema.putAll(newSchema);
+            globalSchemaCache.put(dbName, newSchema);
+            globalGraphCache.put(dbName, newGraph);
             
-            // Discover foreign keys and build schema graph
-            discoverForeignKeys();
+            // Discover foreign keys
+            discoverForeignKeys(dbName, newGraph);
             
-            if (cachedSchema.isEmpty()) {
-                System.out.println("WARNING: No tables found in the database!");
+            if (newSchema.isEmpty()) {
+                System.out.println("WARNING: No tables found in database: " + dbName);
             }
             
         } catch (Exception e) {
@@ -84,25 +100,24 @@ public class SchemaDiscoveryService {
     }
 
     /**
-     * Discover foreign key relationships and populate SchemaGraph
+     * Discover foreign key relationships for a specific database
      */
-    public void discoverForeignKeys() {
+    private void discoverForeignKeys(String dbName, SchemaGraph graph) {
         try (Connection connection = dataSource.getConnection()) {
             DatabaseMetaData metaData = connection.getMetaData();
+            Map<String, List<String>> schema = globalSchemaCache.get(dbName);
             
-            for (String tableName : cachedSchema.keySet()) {
-                // Get imported keys (foreign keys in this table)
-                try (ResultSet foreignKeys = metaData.getImportedKeys(null, null, tableName)) {
+            if (schema == null) return;
+            
+            for (String tableName : schema.keySet()) {
+                try (ResultSet foreignKeys = metaData.getImportedKeys(dbName, null, tableName)) {
                     while (foreignKeys.next()) {
                         String fkTable = foreignKeys.getString("FKTABLE_NAME");
                         String fkColumn = foreignKeys.getString("FKCOLUMN_NAME");
                         String pkTable = foreignKeys.getString("PKTABLE_NAME");
                         String pkColumn = foreignKeys.getString("PKCOLUMN_NAME");
                         
-                        // Add relationship to schema graph
-                        schemaGraph.addRelationship(fkTable, fkColumn, pkTable, pkColumn);
-                        
-                        System.out.println("Found FK: " + fkTable + "." + fkColumn + " -> " + pkTable + "." + pkColumn);
+                        graph.addRelationship(fkTable, fkColumn, pkTable, pkColumn);
                     }
                 }
             }
@@ -111,47 +126,48 @@ public class SchemaDiscoveryService {
         }
     }
     
-    public List<String> getTableNames() {
-        return new ArrayList<>(discoverSchema().keySet());
+    public List<String> getTableNames(String dbName) {
+        return new ArrayList<>(discoverSchema(dbName).keySet());
     }
     
-    public List<String> getColumns(String tableName) {
-        return discoverSchema().getOrDefault(tableName, new ArrayList<>());
+    public List<String> getColumns(String dbName, String tableName) {
+        return discoverSchema(dbName).getOrDefault(tableName, new ArrayList<>());
     }
 
     /**
-     * Get the schema graph for JOIN path finding
+     * Get the schema graph for the default database
      */
     public SchemaGraph getSchemaGraph() {
-        if (schemaGraph.getAllTables().isEmpty()) {
-            discoverForeignKeys();
-        }
-        return schemaGraph;
+        return getSchemaGraph(defaultDatabase);
     }
     
     /**
-     * Set cache TTL in minutes
+     * Get the schema graph for a specific database
      */
+    public SchemaGraph getSchemaGraph(String dbName) {
+        if (dbName == null || dbName.isEmpty()) dbName = defaultDatabase;
+        
+        if (!globalGraphCache.containsKey(dbName)) {
+            discoverSchema(dbName); // Triggers load
+        }
+        return globalGraphCache.get(dbName);
+    }
+    
+    public void setDefaultDatabase(String dbName) {
+        this.defaultDatabase = dbName;
+    }
+    
     public void setCacheTtlMinutes(long minutes) {
         this.cacheTtlMs = minutes * 60 * 1000;
     }
     
-    /**
-     * Clear the cache and force refresh on next access
-     */
     public void clearCache() {
-        cachedSchema.clear();
-        schemaGraph.clearCache();
-        lastRefreshTime = 0;
+        globalSchemaCache.clear();
+        globalGraphCache.clear();
+        lastRefreshTimes.clear();
     }
     
-    /**
-     * Get cache statistics
-     */
     public String getCacheStats() {
-        long ageMs = System.currentTimeMillis() - lastRefreshTime;
-        long ageMinutes = ageMs / (60 * 1000);
-        return String.format("Cache age: %d minutes, Tables: %d, TTL: %d minutes",
-            ageMinutes, cachedSchema.size(), cacheTtlMs / (60 * 1000));
+        return String.format("Cached tables for [engdb]: %d", globalSchemaCache.getOrDefault("engdb", Map.of()).size());
     }
 }

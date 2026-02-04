@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Engdb - Query Engine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
     <div class="app-container">
         <header>
@@ -16,83 +20,109 @@
                 <span class="logo-icon">⚡</span>
                 <h1>Engdb</h1>
             </div>
-            <div class="status-badge online">
-                <span class="dot"></span> System Online
+            <div class="header-controls">
+                <div class="db-selector">
+                    <span class="db-icon">🗄️</span>
+                    <select id="dbSelect">
+                        <option value="engdb">engdb (Default)</option>
+                    </select>
+                </div>
+                <div class="status-badge online">
+                    <span class="dot"></span> System Online
+                </div>
             </div>
         </header>
 
         <main>
-            <section class="query-section">
-                <!-- <div class="welcome-text">
-                    <h2>Natural Language to SQL</h2>
-                    <p>Ask questions in plain English and get instant answers from your database.</p>
-                </div> -->
-
-                <div class="input-wrapper">
-                    <textarea id="queryInput" placeholder="Ask a question (e.g., 'Show all students in CS department')..." rows="1"></textarea>
-                    <button id="submitBtn" class="send-btn">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </button>
+            <aside class="schema-sidebar">
+                <div class="sidebar-header">
+                    <h3>Database Schema</h3>
+                    <button id="refreshSchemaBtn" class="icon-btn" title="Refresh">🔄</button>
                 </div>
-
-                <div class="suggestions">
-                    <span class="label">Try:</span>
-                    <button class="suggestion-chip">Show me all students</button>
-                    <button class="suggestion-chip">Count students in CS</button>
-                    <button class="suggestion-chip">Average student age</button>
-                    <button class="suggestion-chip">Show students with courses</button>
+                <div id="schemaList" class="schema-list">
+                    <!-- Dynamic Schema Content -->
+                    <div class="schema-placeholder">Select a database to view schema</div>
                 </div>
-            </section>
+            </aside>
 
-            <section id="resultSection" class="result-section hidden">
-                <div class="metadata-card">
-                    <div class="meta-item">
-                        <span class="meta-label">Generated SQL</span>
-                        <code id="sqlOutput" class="sql-code">SELECT * FROM ...</code>
+            <div class="content-wrapper">
+                <section class="query-section">
+                    <!-- <div class="welcome-text">
+                        <h2>Natural Language to SQL</h2>
+                        <p>Ask questions in plain English and get instant answers from your database.</p>
+                    </div> -->
+
+                    <div class="input-wrapper">
+                        <textarea id="queryInput"
+                            placeholder="Ask a question (e.g., 'Show all students in CS department')..."
+                            rows="1"></textarea>
+                        <button id="submitBtn" class="send-btn">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </button>
                     </div>
-                    <div class="meta-stats">
-                        <div class="stat">
-                            <span class="stat-value" id="executionTime">0ms</span>
-                            <span class="stat-label">Time</span>
+
+                    <div class="suggestions">
+                        <span class="label">Try:</span>
+                        <button class="suggestion-chip">Show me all students</button>
+                        <button class="suggestion-chip">Count students in CS</button>
+                        <button class="suggestion-chip">Average student age</button>
+                        <button class="suggestion-chip">Show students with courses</button>
+                    </div>
+                </section>
+
+                <section id="resultSection" class="result-section hidden">
+                    <div class="metadata-card">
+                        <div class="meta-item">
+                            <span class="meta-label">Generated SQL</span>
+                            <code id="sqlOutput" class="sql-code">SELECT * FROM ...</code>
                         </div>
-                        <div class="stat">
-                            <span class="stat-value" id="rowCount">0</span>
-                            <span class="stat-label">Rows</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-value" id="confidenceScore">0%</span>
-                            <span class="stat-label">Confidence</span>
+                        <div class="meta-stats">
+                            <div class="stat">
+                                <span class="stat-value" id="executionTime">0ms</span>
+                                <span class="stat-label">Time</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="rowCount">0</span>
+                                <span class="stat-label">Rows</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="confidenceScore">0%</span>
+                                <span class="stat-label">Confidence</span>
+                            </div>
                         </div>
                     </div>
+
+                    <div class="table-container">
+                        <table id="resultsTable">
+                            <thead>
+                                <!-- Dynamic headers -->
+                            </thead>
+                            <tbody>
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <div id="loadingIndicator" class="loading hidden">
+                    <div class="spinner"></div>
+                    <span>Processing query...</span>
                 </div>
 
-                <div class="table-container">
-                    <table id="resultsTable">
-                        <thead>
-                            <!-- Dynamic headers -->
-                        </thead>
-                        <tbody>
-                            <!-- Dynamic rows -->
-                        </tbody>
-                    </table>
+                <div id="errorBanner" class="error-banner hidden">
+                    <span class="icon">⚠️</span>
+                    <span id="errorMessage">Error text here</span>
                 </div>
-            </section>
-            
-            <div id="loadingIndicator" class="loading hidden">
-                <div class="spinner"></div>
-                <span>Processing query...</span>
-            </div>
-
-            <div id="errorBanner" class="error-banner hidden">
-                <span class="icon">⚠️</span>
-                <span id="errorMessage">Error text here</span>
             </div>
         </main>
     </div>
 
     <script src="js/app.js"></script>
 </body>
+
 </html>

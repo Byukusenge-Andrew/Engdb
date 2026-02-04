@@ -33,14 +33,14 @@ public class QueryParser {
     /**
      * Parse tokens and intent into a QueryAST
      */
-    public QueryAST parse(List<String> tokens, IntentResult intentResult) {
+    public QueryAST parse(List<String> tokens, IntentResult intentResult, String dbName) {
         QueryAST ast = new QueryAST();
         
         // Set intent
         ast.setIntent(intentResult.getIntent());
         
         // Recognize entities (tables and columns)
-        EntityRecognizer.EntityRecognitionResult entities = entityRecognizer.recognize(tokens);
+        EntityRecognizer.EntityRecognitionResult entities = entityRecognizer.recognize(tokens, dbName);
         
         if (entities.getTable() != null) {
             ast.setTargetTable(entities.getTable());
@@ -60,13 +60,13 @@ public class QueryParser {
         
         // Extract WHERE conditions
         if (ast.getTargetTable() != null) {
-            ast.setWhereConditions(conditionExtractor.extractConditions(tokens, ast.getTargetTable()));
+            ast.setWhereConditions(conditionExtractor.extractConditions(tokens, ast.getTargetTable(), dbName));
         }
         
         // Detect and build JOINs
-        JoinDetector.JoinDetectionResult joinResult = joinDetector.detectJoins(tokens);
+        JoinDetector.JoinDetectionResult joinResult = joinDetector.detectJoins(tokens, dbName);
         if (joinResult.requiresJoin() && joinResult.getDetectedTables().size() > 1) {
-            buildJoinNodes(ast, joinResult.getDetectedTables());
+            buildJoinNodes(ast, joinResult.getDetectedTables(), dbName);
         }
         
         // TODO: Extract ORDER BY and LIMIT
@@ -105,13 +105,13 @@ public class QueryParser {
     /**
      * Build JOIN nodes based on detected tables using SchemaGraph
      */
-    private void buildJoinNodes(QueryAST ast, List<String> detectedTables) {
+    private void buildJoinNodes(QueryAST ast, List<String> detectedTables, String dbName) {
         if (detectedTables.size() < 2) return;
         
         // Use first table as base, join others
         String baseTable = ast.getTargetTable() != null ? ast.getTargetTable() : detectedTables.get(0);
         
-        var schemaGraph = schemaDiscoveryService.getSchemaGraph();
+        var schemaGraph = schemaDiscoveryService.getSchemaGraph(dbName);
         
         for (String targetTable : detectedTables) {
             if (targetTable.equalsIgnoreCase(baseTable)) continue;

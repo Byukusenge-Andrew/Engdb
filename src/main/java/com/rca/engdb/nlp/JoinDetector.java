@@ -23,8 +23,15 @@ public class JoinDetector {
      * Detect if a query requires JOINs based on tokens
      */
     public JoinDetectionResult detectJoins(List<String> tokens) {
+        return detectJoins(tokens, null);
+    }
+
+    /**
+     * Detect if a query requires JOINs based on tokens
+     */
+    public JoinDetectionResult detectJoins(List<String> tokens, String dbName) {
         Set<String> detectedTables = new HashSet<>();
-        Map<String, List<String>> schema = schemaRegistry.getSchema();
+        Map<String, List<String>> schema = schemaRegistry.getSchema(dbName);
         
         // Strategy 1: Detect multiple table names in query
         for (String token : tokens) {

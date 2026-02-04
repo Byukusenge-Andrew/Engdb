@@ -65,7 +65,11 @@ public class QueryGenerator {
         }
 
         // FROM clause
-        sql.append(" FROM ").append(ast.getTargetTable());
+        if (ast.getDatabaseName() != null && !ast.getDatabaseName().isEmpty()) {
+            sql.append(" FROM ").append(ast.getDatabaseName()).append(".").append(ast.getTargetTable());
+        } else {
+            sql.append(" FROM ").append(ast.getTargetTable());
+        }
 
         // JOIN clauses
         if (!ast.getJoins().isEmpty()) {
@@ -85,8 +89,15 @@ public class QueryGenerator {
                         sql.append("FULL OUTER JOIN ");
                         break;
                 }
-                sql.append(join.getRightTable())
-                   .append(" ON ")
+                
+                // Use qualified table name for right table if database is set
+                if (ast.getDatabaseName() != null && !ast.getDatabaseName().isEmpty()) {
+                    sql.append(ast.getDatabaseName()).append(".").append(join.getRightTable());
+                } else {
+                    sql.append(join.getRightTable());
+                }
+                
+                sql.append(" ON ")
                    .append(join.getLeftTable()).append(".").append(join.getLeftColumn())
                    .append(" = ")
                    .append(join.getRightTable()).append(".").append(join.getRightColumn());

@@ -57,7 +57,7 @@ class QueryPipelineTest {
         List<String> tokens = List.of("show", "me", "all", "students");
         IntentResult intent = new IntentResult(IntentType.SELECT, 0.9);
 
-        QueryAST ast = queryParser.parse(tokens, intent);
+        QueryAST ast = queryParser.parse(tokens, intent, null);
         String sql = queryGenerator.generateSQL(ast);
 
         assertEquals("students", ast.getTargetTable());
@@ -70,7 +70,7 @@ class QueryPipelineTest {
         List<String> tokens = List.of("show", "students", "in", "cs", "department");
         IntentResult intent = new IntentResult(IntentType.SELECT, 0.9);
 
-        QueryAST ast = queryParser.parse(tokens, intent);
+        QueryAST ast = queryParser.parse(tokens, intent, null);
         String sql = queryGenerator.generateSQL(ast);
 
         assertEquals("students", ast.getTargetTable());
@@ -90,7 +90,7 @@ class QueryPipelineTest {
         List<String> tokens = List.of("how", "many", "students", "are", "there");
         IntentResult intent = new IntentResult(IntentType.COUNT, 0.9);
 
-        QueryAST ast = queryParser.parse(tokens, intent);
+        QueryAST ast = queryParser.parse(tokens, intent, null);
         String sql = queryGenerator.generateSQL(ast);
 
         assertEquals("SELECT COUNT(*) FROM students", sql.trim());
@@ -102,7 +102,7 @@ class QueryPipelineTest {
         List<String> tokens = List.of("average", "age", "of", "students");
         IntentResult intent = new IntentResult(IntentType.AVG, 0.9);
 
-        QueryAST ast = queryParser.parse(tokens, intent);
+        QueryAST ast = queryParser.parse(tokens, intent, null);
         String sql = queryGenerator.generateSQL(ast);
 
         assertEquals("age", ast.getAggregateColumn());
@@ -115,7 +115,7 @@ class QueryPipelineTest {
         List<String> tokens = List.of("students", "department", "CS");
         IntentResult intent = new IntentResult(IntentType.SELECT, 0.8);
 
-        QueryAST ast = queryParser.parse(tokens, intent);
+        QueryAST ast = queryParser.parse(tokens, intent, null);
         String sql = queryGenerator.generateSQL(ast);
         
         assertEquals("SELECT * FROM students WHERE department = 'CS'", sql.trim());

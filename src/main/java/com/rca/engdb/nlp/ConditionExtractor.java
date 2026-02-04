@@ -30,10 +30,14 @@ public class ConditionExtractor {
     }
 
     public List<ConditionNode> extractConditions(List<String> tokens, String tableName) {
+        return extractConditions(tokens, tableName, null);
+    }
+
+    public List<ConditionNode> extractConditions(List<String> tokens, String tableName, String dbName) {
         List<ConditionNode> conditions = new ArrayList<>();
         if (tableName == null) return conditions;
 
-        List<String> columns = schemaRegistry.getSchema().getOrDefault(tableName, new ArrayList<>());
+        List<String> columns = schemaRegistry.getSchema(dbName).getOrDefault(tableName, new ArrayList<>());
 
         for (int i = 0; i < tokens.size(); i++) {
             String token = tokens.get(i);
@@ -51,11 +55,11 @@ public class ConditionExtractor {
                         // Skip operator and get value
                         if (i + 2 < tokens.size()) {
                             String potentialValue = tokens.get(i + 2);
-                            if (!isStopWord(potentialValue) && !isTableOrColumn(potentialValue, columns)) {
+                            if (!isStopWord(potentialValue) && !isTableOrColumn(potentialValue, columns, dbName)) {
                                 expectedValue = potentialValue;
                             }
                         }
-                    } else if (!isStopWord(next) && !isTableOrColumn(next, columns)) {
+                    } else if (!isStopWord(next) && !isTableOrColumn(next, columns, dbName)) {
                         // Implicit equality: "department CS"
                         expectedValue = next;
                     }
@@ -64,7 +68,7 @@ public class ConditionExtractor {
                 // If lookahead failed, check previous token (e.g., "CS department")
                 if (expectedValue == null && i > 0) {
                     String prev = tokens.get(i - 1);
-                    if (!isStopWord(prev) && !isOperatorKeyword(prev) && !isTableOrColumn(prev, columns)) {
+                    if (!isStopWord(prev) && !isOperatorKeyword(prev) && !isTableOrColumn(prev, columns, dbName)) {
                         expectedValue = prev;
                     }
                 }
@@ -93,13 +97,13 @@ public class ConditionExtractor {
         return STOP_WORDS.contains(token.toLowerCase());
     }
     
-    private boolean isTableOrColumn(String token, List<String> columns) {
+    private boolean isTableOrColumn(String token, List<String> columns, String dbName) {
         // Check if token is a column name
         for (String col : columns) {
             if (col.equalsIgnoreCase(token)) return true;
         }
         // Check if token is a table name
-        for (String table : schemaRegistry.getSchema().keySet()) {
+        for (String table : schemaRegistry.getSchema(dbName).keySet()) {
             if (table.equalsIgnoreCase(token) || 
                 (token + "s").equalsIgnoreCase(table) ||
                 token.equalsIgnoreCase(table + "s")) {
