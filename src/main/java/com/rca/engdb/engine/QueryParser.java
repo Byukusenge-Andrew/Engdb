@@ -121,14 +121,24 @@ public class QueryParser {
             
             if (joinPath != null && !joinPath.getRelations().isEmpty()) {
                 for (var relation : joinPath.getRelations()) {
-                    JoinNode joinNode = new JoinNode();
-                    joinNode.setJoinType(JoinNode.JoinType.INNER);
-                    joinNode.setLeftTable(relation.getFromTable());
-                    joinNode.setRightTable(relation.getToTable());
-                    joinNode.setLeftColumn(relation.getFromColumn());
-                    joinNode.setRightColumn(relation.getToColumn());
+                    // Check if this relationship is already added
+                    boolean exists = ast.getJoins().stream().anyMatch(j -> 
+                        (j.getLeftTable().equalsIgnoreCase(relation.getFromTable()) && 
+                         j.getRightTable().equalsIgnoreCase(relation.getToTable())) ||
+                        (j.getLeftTable().equalsIgnoreCase(relation.getToTable()) && 
+                         j.getRightTable().equalsIgnoreCase(relation.getFromTable()))
+                    );
                     
-                    ast.getJoins().add(joinNode);
+                    if (!exists) {
+                        JoinNode joinNode = new JoinNode();
+                        joinNode.setJoinType(JoinNode.JoinType.INNER);
+                        joinNode.setLeftTable(relation.getFromTable());
+                        joinNode.setRightTable(relation.getToTable());
+                        joinNode.setLeftColumn(relation.getFromColumn());
+                        joinNode.setRightColumn(relation.getToColumn());
+                        
+                        ast.getJoins().add(joinNode);
+                    }
                 }
             }
         }

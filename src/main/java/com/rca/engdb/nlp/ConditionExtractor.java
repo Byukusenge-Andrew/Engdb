@@ -61,6 +61,14 @@ public class ConditionExtractor {
                     }
                 }
                 
+                // If lookahead failed, check previous token (e.g., "CS department")
+                if (expectedValue == null && i > 0) {
+                    String prev = tokens.get(i - 1);
+                    if (!isStopWord(prev) && !isOperatorKeyword(prev) && !isTableOrColumn(prev, columns)) {
+                        expectedValue = prev;
+                    }
+                }
+                
                 if (expectedValue != null) {
                     conditions.add(new ConditionNode(column, operator, expectedValue));
                 }

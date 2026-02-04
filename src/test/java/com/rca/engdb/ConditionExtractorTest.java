@@ -83,4 +83,23 @@ class ConditionExtractorTest {
         
         assertEquals(0, conditions.size());
     }
+
+    @Test
+    void testValueBeforeColumn() {
+        // "CS department" instead of "department CS"
+        List<String> tokens = List.of("CS", "department", "and", "age", "20");
+        List<ConditionNode> conditions = conditionExtractor.extractConditions(tokens, "students");
+        
+        assertEquals(2, conditions.size());
+        
+        // Find department condition
+        ConditionNode deptCondition = conditions.stream()
+            .filter(c -> c.getColumn().equals("department"))
+            .findFirst()
+            .orElse(null);
+            
+        assertNotNull(deptCondition);
+        assertEquals("=", deptCondition.getOperator());
+        assertEquals("CS", deptCondition.getValue());
+    }
 }

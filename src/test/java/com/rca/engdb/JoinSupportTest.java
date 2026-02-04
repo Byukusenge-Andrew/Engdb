@@ -150,4 +150,25 @@ class JoinSupportTest {
         assertTrue(sql.contains("INNER JOIN enrollments"));
         assertTrue(sql.contains("INNER JOIN courses"));
     }
+
+    @Test
+    void testAvoidDuplicateJoins() {
+        // Simulate detection of [students, enrollments, courses]
+        // Should find path students->enrollments and students->enrollments->courses
+        // But shouldn't add students->enrollments twice
+        
+        List<String> tokens = List.of("students", "enrollments", "courses");
+        IntentResult intent = new IntentResult(IntentType.SELECT, 1.0);
+        
+        // We rely on parse method which calls buildJoinNodes
+        QueryAST ast = queryParser.parse(tokens, intent);
+        
+        long enrollmentJoins = ast.getJoins().stream()
+            .filter(j -> j.getRightTable().equals("enrollments") && j.getLeftTable().equals("students"))
+            .count();
+            
+        assertEquals(1, enrollmentJoins, "Should only have one JOIN between students and enrollments");
+        
+        assertEquals(2, ast.getJoins().size(), "Should have exactly 2 joins (students->enrollments, enrollments->courses)");
+    }
 }

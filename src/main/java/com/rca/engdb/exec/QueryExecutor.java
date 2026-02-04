@@ -14,8 +14,11 @@ import java.util.Map;
 @Service
 public class QueryExecutor {
     
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    public QueryExecutor(org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     /**
      * Execute SQL query and return results
@@ -24,15 +27,13 @@ public class QueryExecutor {
         long startTime = System.currentTimeMillis();
         
         try {
-            Query query = entityManager.createNativeQuery(sql);
-            List<?> rawResults = query.getResultList();
-            
-            List<Map<String, Object>> formattedResults = formatResults(rawResults);
+            // JdbcTemplate.queryForList returns List<Map<String, Object>> with column names as keys
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(sql);
             long executionTime = System.currentTimeMillis() - startTime;
             
             return new QueryResult(
-                formattedResults,
-                formattedResults.size(),
+                results,
+                results.size(),
                 executionTime,
                 true,
                 null
@@ -49,32 +50,8 @@ public class QueryExecutor {
             );
         }
     }
-
-    /**
-     * Format raw query results into a list of maps
-     */
-    private List<Map<String, Object>> formatResults(List<?> rawResults) {
-        List<Map<String, Object>> formatted = new ArrayList<>();
-        
-        for (Object row : rawResults) {
-            Map<String, Object> rowMap = new HashMap<>();
-            
-            if (row instanceof Object[]) {
-                // Multiple columns
-                Object[] columns = (Object[]) row;
-                for (int i = 0; i < columns.length; i++) {
-                    rowMap.put("column_" + i, columns[i]);
-                }
-            } else {
-                // Single column (e.g., COUNT, SUM)
-                rowMap.put("result", row);
-            }
-            
-            formatted.add(rowMap);
-        }
-        
-        return formatted;
-    }
+    
+    // formatResults method is no longer needed
 
     /**
      * Result container
