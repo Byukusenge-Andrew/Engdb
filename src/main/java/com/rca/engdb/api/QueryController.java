@@ -12,6 +12,7 @@ import com.rca.engdb.ml.IntentClassifier;
 import com.rca.engdb.ml.IntentResult;
 import com.rca.engdb.nlp.PreprocessService;
 import com.rca.engdb.nlp.TokenizerService;
+import com.rca.engdb.ml.IntentType;
 import com.rca.engdb.ast.QueryAST;
 import com.rca.engdb.schema.DatabaseDiscoveryService;
 import com.rca.engdb.schema.SchemaDiscoveryService;
@@ -55,8 +56,8 @@ public class QueryController {
     }
     
     @GetMapping("/databases")
-    public List<String> getDatabases() {
-        return databaseDiscoveryService.getAllDatabases();
+    public List<String> getDatabases(@RequestParam(defaultValue = "mysql") String serviceType) {
+        return databaseDiscoveryService.getAllDatabases(serviceType);
     }
     
     @GetMapping("/schema")
@@ -83,8 +84,8 @@ public class QueryController {
                 ast.setDatabaseName(dbName);
             }
 
-            // Check if a target table was identified
-            if (ast.getTargetTable() == null) {
+            // Check if a target table was identified (unless it's a SCHEMA intent)
+            if (ast.getTargetTable() == null && intentResult.getIntent() != IntentType.SCHEMA) {
                 return new QueryResponse(
                     intentResult.getIntent().name(),
                     "Could not identify a clear query target (table). Please include a valid table name in your question.",

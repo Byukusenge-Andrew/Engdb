@@ -7,5 +7,6 @@ public enum IntentType {
     AVG,
     MAX,
     MIN,
+    SCHEMA,
     UNKNOWN
 }

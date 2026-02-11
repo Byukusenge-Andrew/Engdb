@@ -17,8 +17,9 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable()) // Disable CSRF for simpler API testing
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/index.html", "/css/**", "/js/**").permitAll() // Allow static resources
-                .requestMatchers("/api/**").authenticated() // Secure API
+                .requestMatchers("/", "/index.html", "/databases.html", "/query.html", "/css/**", "/js/**").permitAll() // Allow static resources
+                .requestMatchers("/api/query/**").permitAll() // Allow public access to query endpoints
+                .requestMatchers("/api/**").authenticated() // Secure other API endpoints
                 .anyRequest().authenticated()
             )
             .httpBasic(withDefaults()); // Use Basic Auth

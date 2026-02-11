@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Query Engine - EngDB</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #333;
+        }
+
+        .context-info {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .chat-area {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            padding: 10px 15px;
+            border-radius: 10px;
+            max-width: 80%;
+            line-height: 1.5;
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background-color: #007bff;
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+
+        .system-message {
+            align-self: flex-start;
+            background-color: #f1f0f0;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+
+        .query-generated {
+            font-family: monospace;
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 5px;
+            font-size: 13px;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #007bff;
+        }
+
+        button {
+            padding: 0 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h1>EngDB Query Engine</h1>
+        <div class="context-info" id="contextInfo">Database: ...</div>
+    </div>
+
+    <div class="container">
+        <div class="chat-area" id="chatArea">
+            <div class="message system-message">
+                Hello! I'm your Natural Language Database Assistant.
+                Ask me anything about your data in <strong id="dbNameDisplay">...</strong>.
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="queryInput" placeholder="Ask a question in plain English..." autocomplete="off">
+            <button id="sendBtn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const dbName = urlParams.get('db');
+        const serviceType = urlParams.get('service');
+
+        if (!dbName) {
+            alert("No database selected. Redirecting to selection.");
+            window.location.href = "/";
+        }
+
+        document.getElementById('contextInfo').innerText = `${serviceType === 'mongodb' ? 'MongoDB' : 'MySQL'} / ${dbName}`;
+        document.getElementById('dbNameDisplay').innerText = dbName;
+
+        const chatArea = document.getElementById('chatArea');
+        const queryInput = document.getElementById('queryInput');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function appendMessage(html, isUser) {
+            const div = document.createElement('div');
+            div.className = `message ${isUser ? 'user-message' : 'system-message'}`;
+            div.innerHTML = html;
+            chatArea.appendChild(div);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+
+        function buildTable(data) {
+            if (!data || data.length === 0) return 'No results found.';
+
+            const cols = Object.keys(data[0]);
+            let html = '<table><thead><tr>';
+            cols.forEach(col => html += `<th>${col}</th>`);
+            html += '</tr></thead><tbody>';
+
+            data.forEach(row => {
+                html += '<tr>';
+                cols.forEach(col => html += `<td>${row[col]}</td>`);
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        async function handleQuery() {
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            appendMessage(query, true);
+            queryInput.value = '';
+            queryInput.disabled = true;
+            sendBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        databaseName: dbName,
+                        serviceType: serviceType // Backend might ignore this if not updated, but good to pass
+                    })
+                });
+
+                if (!response.ok) throw new Error("API Request Failed");
+
+                const result = await response.json();
+
+                let content = `<div>${result.naturalResponse || ''}</div>`;
+                if (result.generatedQuery) {
+                    content += `<div class="query-generated">${result.generatedQuery}</div>`;
+                }
+                if (result.errorMessage) {
+                    content += `<div style="color: red; margin-top: 5px;">Error: ${result.errorMessage}</div>`;
+                } else if (result.data) {
+                    content += buildTable(result.data);
+                }
+
+                appendMessage(content, false);
+
+            } catch (error) {
+                appendMessage(`Error: ${error.message}`, false);
+            } finally {
+                queryInput.disabled = false;
+                sendBtn.disabled = false;
+                queryInput.focus();
+            }
+        }
+
+        sendBtn.addEventListener('click', handleQuery);
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleQuery();
+        });
+    </script>
+</body>
+
+</html>

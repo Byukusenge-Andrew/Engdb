@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Database - EngDB</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .db-list {
+            list-style: none;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .db-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .db-item:hover {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .back-link {
+            display: block;
+            margin-bottom: 20px;
+            color: #6c757d;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            text-align: center;
+            color: #6c757d;
+            padding: 40px;
+        }
+
+        .error {
+            color: #dc3545;
+            text-align: center;
+            padding: 20px;
+            background-color: #f8d7da;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <a href="/" class="back-link">← Back to Service Selection</a>
+        <h1 id="pageTitle">Select Database</h1>
+        <div id="loading" class="loading">Loading databases...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <ul id="dbList" class="db-list"></ul>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const serviceType = urlParams.get('service') || 'mysql';
+
+            // Update title
+            const serviceName = serviceType === 'mongodb' ? 'MongoDB' : 'MySQL';
+            document.getElementById('pageTitle').innerText = `Select ${serviceName} Database`;
+
+            // Fetch databases
+            fetch(`/api/query/databases?serviceType=${serviceType}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const list = document.getElementById('dbList');
+                    const loading = document.getElementById('loading');
+                    loading.style.display = 'none';
+
+                    if (data.length === 0) {
+                        const empty = document.createElement('div');
+                        empty.className = 'loading';
+                        empty.textContent = 'No databases found.';
+                        list.parentNode.appendChild(empty);
+                        return;
+                    }
+
+                    data.forEach(dbName => {
+                        const li = document.createElement('li');
+                        li.className = 'db-item';
+                        li.textContent = dbName;
+                        li.onclick = () => {
+                            // Redirect to query page
+                            window.location.href = `/query.html?db=${dbName}&service=${serviceType}`;
+                        };
+                        list.appendChild(li);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('loading').style.display = 'none';
+                    const errorDiv = document.getElementById('error');
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = 'Failed to load databases. Please make sure the service is running.';
+                });
+        });
+    </script>
+</body>
+
+</html>

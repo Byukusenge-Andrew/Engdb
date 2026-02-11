@@ -13,7 +13,8 @@ import java.util.stream.Collectors;
 public class QueryGenerator {
     
     public String generateSQL(QueryAST ast) {
-        if (ast.getTargetTable() == null) {
+        // Allow null target table only for SCHEMA intent
+        if (ast.getTargetTable() == null && ast.getIntent() != IntentType.SCHEMA) {
             throw new IllegalArgumentException("Target table cannot be null");
         }
 
@@ -21,6 +22,10 @@ public class QueryGenerator {
 
         // Build SELECT clause based on intent
         switch (ast.getIntent()) {
+            case SCHEMA:
+                sql.append("SHOW TABLES");
+                return sql.toString();
+
             case SELECT:
                 sql.append("SELECT ");
                 if (ast.getSelectColumns().isEmpty() || ast.getSelectColumns().contains("*")) {
@@ -149,11 +154,16 @@ public class QueryGenerator {
     }
 
     public String generateMongoQuery(QueryAST ast) {
-        if (ast.getTargetTable() == null) {
+        if (ast.getTargetTable() == null && ast.getIntent() != IntentType.SCHEMA) {
             throw new IllegalArgumentException("Target collection cannot be null");
         }
 
         StringBuilder mongoQuery = new StringBuilder();
+        
+        if (ast.getIntent() == IntentType.SCHEMA) {
+            return "db.getCollectionNames()";
+        }
+
         mongoQuery.append("db.").append(ast.getTargetTable());
 
         switch (ast.getIntent()) {

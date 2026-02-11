@@ -4,125 +4,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Engdb - Query Engine</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <title>Select Database Service - EngDB</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+
+        .card-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .card {
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 30px;
+            cursor: pointer;
+            width: 150px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .card:hover {
+            border-color: #007bff;
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .card h2 {
+            margin: 0;
+            font-size: 18px;
+            color: #555;
+        }
+
+        .card:hover h2 {
+            color: #007bff;
+        }
+    </style>
 </head>
 
 <body>
-    <div class="app-container">
-        <header>
-            <div class="logo">
-                <span class="logo-icon">⚡</span>
-                <h1>Engdb</h1>
-            </div>
-            <div class="header-controls">
-                <div class="db-selector">
-                    <span class="db-icon">🗄️</span>
-                    <select id="dbSelect">
-                        <option value="engdb">engdb (Default)</option>
-                    </select>
-                </div>
-                <div class="status-badge online">
-                    <span class="dot"></span> System Online
-                </div>
-            </div>
-        </header>
 
-        <main>
-            <aside class="schema-sidebar">
-                <div class="sidebar-header">
-                    <h3>Database Schema</h3>
-                    <button id="refreshSchemaBtn" class="icon-btn" title="Refresh">🔄</button>
-                </div>
-                <div id="schemaList" class="schema-list">
-                    <!-- Dynamic Schema Content -->
-                    <div class="schema-placeholder">Select a database to view schema</div>
-                </div>
-            </aside>
-
-            <div class="content-wrapper">
-                <section class="query-section">
-                    <!-- <div class="welcome-text">
-                        <h2>Natural Language to SQL</h2>
-                        <p>Ask questions in plain English and get instant answers from your database.</p>
-                    </div> -->
-
-                    <div class="input-wrapper">
-                        <textarea id="queryInput"
-                            placeholder="Ask a question (e.g., 'Show all students in CS department')..."
-                            rows="1"></textarea>
-                        <button id="submitBtn" class="send-btn">
-                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div class="suggestions">
-                        <span class="label">Try:</span>
-                        <button class="suggestion-chip">Show me all students</button>
-                        <button class="suggestion-chip">Count students in CS</button>
-                        <button class="suggestion-chip">Average student age</button>
-                        <button class="suggestion-chip">Show students with courses</button>
-                    </div>
-                </section>
-
-                <section id="resultSection" class="result-section hidden">
-                    <div class="metadata-card">
-                        <div class="meta-item">
-                            <span class="meta-label">Generated SQL</span>
-                            <code id="sqlOutput" class="sql-code">SELECT * FROM ...</code>
-                        </div>
-                        <div class="meta-stats">
-                            <div class="stat">
-                                <span class="stat-value" id="executionTime">0ms</span>
-                                <span class="stat-label">Time</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="rowCount">0</span>
-                                <span class="stat-label">Rows</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-value" id="confidenceScore">0%</span>
-                                <span class="stat-label">Confidence</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="table-container">
-                        <table id="resultsTable">
-                            <thead>
-                                <!-- Dynamic headers -->
-                            </thead>
-                            <tbody>
-                                <!-- Dynamic rows -->
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <div id="loadingIndicator" class="loading hidden">
-                    <div class="spinner"></div>
-                    <span>Processing query...</span>
-                </div>
-
-                <div id="errorBanner" class="error-banner hidden">
-                    <span class="icon">⚠️</span>
-                    <span id="errorMessage">Error text here</span>
-                </div>
-            </div>
-        </main>
+    <div class="container">
+        <h1>Select Database Service</h1>
+        <div class="card-container">
+            <a href="/databases.html?service=mysql" class="card">
+                <span class="icon">🐬</span>
+                <h2>MySQL</h2>
+            </a>
+            <a href="/databases.html?service=mongodb" class="card">
+                <span class="icon">🍃</span>
+                <h2>MongoDB</h2>
+            </a>
+        </div>
     </div>
 
-    <script src="js/app.js"></script>
 </body>
 
 </html>

@@ -15,7 +15,8 @@ public class IntentClassifier {
         IntentType.AVG, List.of("average", "avg", "mean"),
         IntentType.MAX, List.of("max", "highest", "largest"),
         IntentType.MIN, List.of("min", "lowest", "smallest"),
-        IntentType.SELECT, List.of("list", "show", "display", "find")
+        IntentType.SELECT, List.of("list", "show", "display", "find"),
+        IntentType.SCHEMA, List.of("tables", "schema", "databases", "structure")
     );
 
     public IntentResult classify(List<String> tokens) {
