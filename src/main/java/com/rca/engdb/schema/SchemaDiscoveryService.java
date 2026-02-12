@@ -80,7 +80,10 @@ public class SchemaDiscoveryService {
                         }
                     }
                     
-                    newSchema.put(tableName, columns);
+
+                    
+                    // Prefix table name with database name to ensure cross-database queries work
+                    newSchema.put(dbName + "." + tableName, columns);
                 }
             }
             

@@ -34,6 +34,7 @@ public class QueryController {
     private final QueryExecutor queryExecutor;
     private final DatabaseDiscoveryService databaseDiscoveryService;
     private final SchemaDiscoveryService schemaDiscoveryService;
+    private final com.rca.engdb.integration.OpenRouterService openRouterService;
 
     public QueryController(
             TokenizerService tokenizer,
@@ -43,7 +44,8 @@ public class QueryController {
             QueryGenerator queryGenerator,
             QueryExecutor queryExecutor,
             DatabaseDiscoveryService databaseDiscoveryService,
-            SchemaDiscoveryService schemaDiscoveryService) {
+            SchemaDiscoveryService schemaDiscoveryService,
+            com.rca.engdb.integration.OpenRouterService openRouterService) {
 
         this.tokenizer = tokenizer;
         this.preprocessor = preprocessor;
@@ -53,6 +55,7 @@ public class QueryController {
         this.queryExecutor = queryExecutor;
         this.databaseDiscoveryService = databaseDiscoveryService;
         this.schemaDiscoveryService = schemaDiscoveryService;
+        this.openRouterService = openRouterService;
     }
     
     @GetMapping("/databases")
@@ -76,46 +79,58 @@ public class QueryController {
         String dbName = request.getDatabaseName();
 
         // 2. Query Parsing & Generation
+        String generatedQuery = null;
+        QueryExecutor.QueryResult result = null;
+
         try {
-            QueryAST ast = queryParser.parse(cleaned, intentResult, dbName);
-            
-            // Set database context in AST for generation
-            if (dbName != null && !dbName.isEmpty()) {
-                ast.setDatabaseName(dbName);
+
+            // Try OpenRouter first
+            if (openRouterService != null) {
+                // Get schema for context
+                var schema = schemaDiscoveryService.discoverSchema(dbName);
+                generatedQuery = openRouterService.generateSQL(request.getQuery(), schema);
             }
 
-            // Check if a target table was identified (unless it's a SCHEMA intent)
-            if (ast.getTargetTable() == null && intentResult.getIntent() != IntentType.SCHEMA) {
-                return new QueryResponse(
-                    intentResult.getIntent().name(),
-                    "Could not identify a clear query target (table). Please include a valid table name in your question.",
-                    Collections.emptyList(),
-                    0,
-                    intentResult.getConfidence(),
-                    0,
-                    "No target table identified in query"
-                );
-            }
-
-            // 3. Choose database type
-            QueryPlanner planner = new QueryPlanner();
-            QueryPlanner.DatabaseType dbType = planner.chooseDatabaseType(ast);
-
-            String generatedQuery;
-            QueryExecutor.QueryResult result;
-
-            if (dbType == QueryPlanner.DatabaseType.MONGODB) {
-                // MongoDB execution
-                generatedQuery = queryGenerator.generateMongoQuery(ast);
-                // Note: Actual MongoDB execution would require parsing the generated query
-                // For now, we'll fall back to SQL
-                String sql = queryGenerator.generateSQL(ast);
-                result = queryExecutor.executeSQLQuery(sql);
-                generatedQuery = sql + " (MongoDB: " + generatedQuery + ")";
-            } else {
-                // MySQL execution
-                generatedQuery = queryGenerator.generateSQL(ast);
+            if (generatedQuery != null) {
+                // Execute generated SQL
                 result = queryExecutor.executeSQLQuery(generatedQuery);
+            } else {
+                // Fallback to local rule-based engine
+                QueryAST ast = queryParser.parse(cleaned, intentResult, dbName);
+                
+                // Set database context in AST for generation
+                if (dbName != null && !dbName.isEmpty()) {
+                    ast.setDatabaseName(dbName);
+                }
+
+                // Check if a target table was identified (unless it's a SCHEMA intent)
+                if (ast.getTargetTable() == null && intentResult.getIntent() != IntentType.SCHEMA) {
+                    return new QueryResponse(
+                        intentResult.getIntent().name(),
+                        "Could not identify a clear query target (table). Please include a valid table name in your question.",
+                        Collections.emptyList(),
+                        0,
+                        intentResult.getConfidence(),
+                        0,
+                        "No target table identified in query"
+                    );
+                }
+
+                // Choose database type
+                QueryPlanner planner = new QueryPlanner();
+                QueryPlanner.DatabaseType dbType = planner.chooseDatabaseType(ast);
+
+                if (dbType == QueryPlanner.DatabaseType.MONGODB) {
+                    // MongoDB execution
+                    generatedQuery = queryGenerator.generateMongoQuery(ast);
+                    String sql = queryGenerator.generateSQL(ast);
+                    result = queryExecutor.executeSQLQuery(sql);
+                    generatedQuery = sql + " (MongoDB: " + generatedQuery + ")";
+                } else {
+                    // MySQL execution
+                    generatedQuery = queryGenerator.generateSQL(ast);
+                    result = queryExecutor.executeSQLQuery(generatedQuery);
+                }
             }
 
             return new QueryResponse(
@@ -140,6 +155,16 @@ public class QueryController {
                 0,
                 e.getMessage()
             );
+        } finally {
+             // Log the result size for debugging
+             if (result != null) {
+                 System.out.println("Query executed. Rows returned: " + result.getRowCount());
+                 if (result.getData() != null && !result.getData().isEmpty()) {
+                     System.out.println("First row: " + result.getData().get(0));
+                 }
+             } else {
+                 System.out.println("Query execution failed or returned null result.");
+             }
         }
     }
 }

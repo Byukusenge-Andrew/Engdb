@@ -245,8 +245,10 @@
                 }
                 if (result.errorMessage) {
                     content += `<div style="color: red; margin-top: 5px;">Error: ${result.errorMessage}</div>`;
-                } else if (result.data) {
-                    content += buildTable(result.data);
+                } else if (result.results && result.results.length > 0) {
+                    content += buildTable(result.results);
+                } else if (result.rowCount === 0) {
+                    content += '<div>No results found.</div>';
                 }
 
                 appendMessage(content, false);
